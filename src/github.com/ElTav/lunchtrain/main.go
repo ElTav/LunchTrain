@@ -123,6 +123,7 @@ func (s *Station) AddTrain(t *Train) error {
 		s.Trains[t.MapDestination] = t
 		return nil
 	} else {
+		log.Printf("Train to %s already exists", t.DisplayDestination)
 		return fmt.Errorf("Train to %s already exists", t.DisplayDestination)
 	}
 }
@@ -135,6 +136,7 @@ func (s *Station) DeleteTrain(dest string) error {
 		 delete(s.Trains, dest)
 		 return nil
 	} else {
+		log.Printf("The train to %s doesn't exist so it can't be removed", dest)
 		return fmt.Errorf("The train to %s doesn't exist so it can't be removed", dest)
 	}
 }
@@ -192,6 +194,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&webMsg)	
 	if err != nil {
+		log.Printf(err.Error())
 		PostMessage(err.Error())
 		return
 	}
