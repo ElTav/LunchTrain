@@ -18,7 +18,6 @@ import (
 /*
 To-do list
 ---------
-Trains active
 Manually depart a train
 Derail a train
 Start a train at a designated time
@@ -213,7 +212,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	notFound := "That train doesn't exist, please try again"
 	switch cmd {
 	case "help":
-		msg = "Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination>"
+		msg = "Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active"
 		PostMessage(msg)
 	case "passengers":
 		dest, _, err := GetDestinationAndTime(2, messageParts, false)
@@ -278,6 +277,37 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				PostMessage(msg)
 				go MonitorTrain(train)
 			}
+		}
+	case "active":
+		if len(messageParts) != 2 {
+			PostMessage(malformed)
+			break
+		}
+		if len(station.Trains) == 0 {
+			msg = fmt.Sprintf("There are currently no active trains")
+			PostMessage(msg)
+		} else {
+			var finalMsg bytes.Buffer
+			finalMsg.WriteString("There are trains to: ")
+			i := 0
+			for _, v := range station.Trains {
+				if len(station.Trains) == 1 {
+					msg = fmt.Sprintf("There is currently a train to %v (with %v on it)", v.DisplayDestination, v.PassengerString())
+					PostMessage(msg)
+					return
+				} else {
+					finalMsg.WriteString(fmt.Sprintf("%v (with %v on it)", v.DisplayDestination, v.PassengerString()))
+				}
+				if i == len(station.Trains) - 2 {
+					finalMsg.WriteString("and ")
+	 		    }
+				if i != len(station.Trains) - 1 {
+					finalMsg.WriteString(", ")
+				}
+				i++
+				
+			}
+			PostMessage(finalMsg.String())
 		}
 	default:
 		PostMessage(malformed)
