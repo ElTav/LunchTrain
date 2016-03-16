@@ -16,10 +16,21 @@ import (
 )
 
 /*
+To-do list
+---------
 Case insensitive
 Trains active
 Manually depart a train
+Derail a train
 Start a train at a designated time
+Tag people when the train leaves
+Propose a train that starts if enough people join -> X
+-----
+Keep track of usage statistics
+Look into making your own log to log things
+
+53 so far
+Look into moving to AWS
 */
 
 var authKey string = ""
