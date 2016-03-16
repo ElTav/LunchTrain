@@ -338,12 +338,12 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				} else {
 					finalMsg.WriteString(fmt.Sprintf("%v (with %v on it)", v.DisplayDestination, v.PassengerString()))
 				}
-				if i == len(station.Trains) - 2 {
-					finalMsg.WriteString("and ")
-	 		    }
 				if i != len(station.Trains) - 1 {
 					finalMsg.WriteString(", ")
 				}
+				if i == len(station.Trains) - 2 {
+					finalMsg.WriteString("and ")
+	 		    }
 				i++
 				
 			}
