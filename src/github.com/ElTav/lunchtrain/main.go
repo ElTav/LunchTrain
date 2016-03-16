@@ -102,9 +102,9 @@ func (t *Train) PassengerString() string {
 	   if i != len(t.Passengers) - 1 {
 	    	buffer.WriteString(", ")
 	    }
-	    if i == len(t.Passengers) - 2 {
+	   if i == len(t.Passengers) - 2 {
 	    	buffer.WriteString("and ")
-	    }
+	   }
 	}
 	return buffer.String()
 	 
