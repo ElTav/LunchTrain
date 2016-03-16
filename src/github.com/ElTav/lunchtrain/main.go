@@ -206,12 +206,12 @@ func DitchTrain(conductor string) {
 	delete(old.PassengerSet, conductor)
 	old.Lock.Unlock()
 	if len(old.PassengerSet) == 0 {
-		msg = fmt.Sprintf("It crashed and burned. There were no fatalities.")
+		msg = fmt.Sprintf(" It crashed and burned. There were no fatalities.")
 		finalMsg.WriteString(msg)
 		station.DeleteTrain(old.MapDestination)
 		old.Delete <- struct{}{}
 	}
-	PostMessage(msg)
+	PostMessage(finalMsg.String())
 }
 
 func Handler(w rest.ResponseWriter, r *rest.Request) {
