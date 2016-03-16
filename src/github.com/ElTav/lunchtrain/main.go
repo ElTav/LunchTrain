@@ -262,6 +262,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		_, ok := station.Trains[strings.ToLower(dest)]
 		if ok {
 			msg = fmt.Sprintf("There's already a train to %v!", dest)
+			PostMessage(msg)
 			break
 		} else { 
 			train := NewTrain(author, length, dest)
