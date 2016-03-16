@@ -18,7 +18,6 @@ import (
 /*
 To-do list
 ---------
-Case insensitive
 Trains active
 Manually depart a train
 Derail a train
@@ -57,7 +56,8 @@ type Train struct {
 	Lock *sync.Mutex
 	LeavingTimer *time.Timer
 	ReminderTimer *time.Timer
-	Destination string
+	MapDestination string
+	DisplayDestination string
 	Passengers []string
 	PassengerSet map[string]struct{}
 }
@@ -72,7 +72,8 @@ func NewTrain(conductor string, departure int, dest string) *Train {
 		Lock: &sync.Mutex{},
 		LeavingTimer: timer,
 		ReminderTimer: timer2,
-		Destination: dest,
+		MapDestination: strings.ToLower(dest),
+		DisplayDestination: dest,
 		Passengers: users,
 		PassengerSet: trainMap,
 	}	
@@ -117,12 +118,12 @@ type Station struct {
 func (s *Station) AddTrain(t *Train) error {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
-	_, ok := s.Trains[t.Destination]
+	_, ok := s.Trains[t.MapDestination]
 	if !ok {
-		s.Trains[t.Destination] = t
+		s.Trains[t.MapDestination] = t
 		return nil
 	} else {
-		return fmt.Errorf("Train to %s already exists", t.Destination)
+		return fmt.Errorf("Train to %s already exists", t.DisplayDestination)
 	}
 }
 
@@ -152,15 +153,15 @@ func MonitorTrain(train *Train) {
 		select {
 	    case <- train.LeavingTimer.C:
 	    	var buffer bytes.Buffer
-	    	start := fmt.Sprintf("The train to %v has left the station with ", train.Destination)
+	    	start := fmt.Sprintf("The train to %v has left the station with ", train.DisplayDestination)
 	    	buffer.WriteString(start)
 	    	buffer.WriteString(train.PassengerString())
 	    	buffer.WriteString(" on it!")
 	    	PostMessage(buffer.String())
-	    	station.DeleteTrain(train.Destination)
+	    	station.DeleteTrain(train.MapDestination)
 	    	return
 	    case <- train.ReminderTimer.C:
-            PostMessage(fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.Destination))
+            PostMessage(fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination))
 	    default:
 		}
 	}
@@ -204,7 +205,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		PostMessage(insufficientParams)
 		return 
 	}
-	cmd := messageParts[1]
+	cmd := strings.ToLower(messageParts[1])
 	malformed := "Your command is malformed or not found, please view the help message (/train help) for more details"
 	notFound := "That train doesn't exist, please try again"
 	switch cmd {
@@ -217,14 +218,14 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			PostMessage(err.Error())
 			break
 		}
-		train, ok := station.Trains[dest]
+		train, ok := station.Trains[strings.ToLower(dest)]
 		if !ok {
 			PostMessage(notFound)
 		} else {
 			if len(train.Passengers) == 1 {
-				msg = fmt.Sprintf("%v is on the train to %v", train.PassengerString(), train.Destination)
+				msg = fmt.Sprintf("%v is on the train to %v", train.PassengerString(), train.DisplayDestination)
 			} else {
-				msg = fmt.Sprintf("%v are on the train to %v", train.PassengerString(), train.Destination)
+				msg = fmt.Sprintf("%v are on the train to %v", train.PassengerString(), train.DisplayDestination)
 			}
 			PostMessage(msg)
 		}
@@ -234,11 +235,11 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			PostMessage(err.Error())
 			break
 		}
-		train, ok := station.Trains[dest]
+		train, ok := station.Trains[strings.ToLower(dest)]
 		if ok {
 			err := train.NewPassenger(author)
 			if err == nil {
-				msg = fmt.Sprintf("%s jumped on the train to %s", author, train.Destination)
+				msg = fmt.Sprintf("%s jumped on the train to %s", author, train.DisplayDestination)
 				PostMessage(msg)
 			} else {
 				msg = err.Error()
@@ -258,7 +259,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			PostMessage(msg)
 			break
 		}
-		_, ok := station.Trains[dest]
+		_, ok := station.Trains[strings.ToLower(dest)]
 		if ok {
 			msg = fmt.Sprintf("There's already a train to %v!", dest)
 			break
@@ -269,7 +270,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				PostMessage(err.Error())
 				break
 			} else {
-				msg = fmt.Sprintf("%s has started a train to %v that leaves in %v minutes!", author, train.Destination, length)
+				msg = fmt.Sprintf("%s has started a train to %v that leaves in %v minutes!", author, train.DisplayDestination, length)
 				PostMessage(msg)
 				go MonitorTrain(train)
 			}
