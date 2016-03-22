@@ -1,0 +1,23 @@
+type,destination,user,message,date
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/21/2016
+startTrain,test,Leandro,Leandro has started a train to test that leaves in 1 minutes!,03/21/2016
+reminder,test,reminder,"Reminder, the next train to test leaves in one minute",03/21/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/21/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+help,,Leandro,Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active,03/22/2016
+startTrain,tenich,Leandro,Leandro has started a train to tenich that leaves in 1 minutes!,03/22/2016
+reminder,tenich,reminder,"Reminder, the next train to tenich leaves in one minute",03/22/2016
+active,tenich,Leandro,There is currently a train to tenich (with Leandro on it),03/22/2016
+active,tenich,Leandro,There is currently a train to tenich (with Leandro on it),03/22/2016
+departure,tenich,departure,The train to tenich has left the station with Leandro on it!,03/22/2016
+activeError,,Leandro,There are currently no active trains,03/22/2016
+activeError,,Leandro,There are currently no active trains,03/22/2016
+activeError,,Leandro,There are currently no active trains,03/22/2016
+startTrain,tenoch,Leandro,Leandro has started a train to tenoch that leaves in 1 minutes!,03/22/2016
+reminder,tenoch,reminder,"Reminder, the next train to tenoch leaves in one minute",03/22/2016
+startTrain,tenoc2h,Leandro22,Leandro22 has started a train to tenoc2h that leaves in 1 minutes!,03/22/2016
+reminder,tenoc2h,reminder,"Reminder, the next train to tenoc2h leaves in one minute",03/22/2016

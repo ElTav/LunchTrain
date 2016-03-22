@@ -22,8 +22,6 @@ Time left on a train (is this possible?)
 Start a train at a designated time
 Tag people when the train leaves (message them?)
 -----
-Keep track of usage statistics
-Look into making your own log to log things
 
 90 so far
 Look into moving to AWS
@@ -37,6 +35,8 @@ var station *Station = &Station{
 	Passengers: make(map[string]*Train),
 	Trains: make(map[string]*Train),
 }
+
+var fileMutex = &sync.Mutex{}
 
 type WebhookMessage struct {
     Item struct {
@@ -167,11 +167,40 @@ func NewMessage(category, destination, user, raw string) Message {
 
 func PostMessage(msg Message) {
 	c := hipchat.NewClient(authKey)
+	if err := MessageToCSV(msg); err != nil {
+		log.Println("Error writing to csv: ", err)
+	}
 	msgReq := &hipchat.NotificationRequest{Message: msg.RawMessage}
 	_, err := c.Room.Notification(roomName, msgReq)
 	if err != nil {
 		panic(err)
 	}
+}
+
+
+func MessageToCSV(msg Message) error {
+	file, err := os.OpenFile("log.csv", os.O_RDWR | os.O_CREATE, 0666)
+	if err != nil {
+		log.Println("Error opening file: ", err)
+	}
+	defer file.Close()
+	messages := []*Message{}
+	if _, err := gocsv.MarshalString(&messages); err == nil {
+    		if err := gocsv.UnmarshalFile(file, &messages); err != nil { // Load clients from file
+     		   log.Println("Error unmarshaling the file")
+     		   return err
+    		}
+    		messages := append(messages, &msg)
+    		if _, err := file.Seek(0, 0); err != nil { // Go to the start of the file
+    			log.Printf("Error seeking %v", err)
+    			return err
+    		}
+    		if err = gocsv.MarshalFile(&messages, file); err != nil {
+    			log.Println("Error writing open file ", err)
+    			return err
+    		}
+    }
+	return nil
 }
 
 func MonitorTrain(train *Train) {
