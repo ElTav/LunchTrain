@@ -18,15 +18,14 @@ import (
 /*
 To-do list
 ---------
-Manually depart a train
+Time left on a train (is this possible?)
 Start a train at a designated time
-Tag people when the train leaves
-Propose a train that starts if enough people join -> X
+Tag people when the train leaves (message them?)
 -----
 Keep track of usage statistics
 Look into making your own log to log things
 
-53 so far
+90 so far
 Look into moving to AWS
 */
 
@@ -142,14 +141,33 @@ func (s *Station) DeleteTrain(dest string) error {
 		delete(s.Trains, dest)
 		return nil
 	} else {
-		log.Printf("The train to %s doesn't exist so it can't be removed", dest)
-		return fmt.Errorf("The train to %s doesn't exist so it can't be removed", dest)
+		err := fmt.Sprintf("The train to %s doesn't exist so it can't be removed", dest)
+		log.Println(err)
+		return fmt.Errorf(err)
 	}
 }
 
-func PostMessage(msg string) {
+type Message struct {
+	Type string `csv:"type"`
+	Destination string `csv:"destination"`
+	User string `csv:"user"`
+	RawMessage string `csv:"message"`
+	Date string `csv:"date"`
+}
+
+func NewMessage(category, destination, user, raw string) Message { 
+	return Message{
+		Type: category,
+		Destination: destination,
+		User: user,
+		RawMessage: raw,
+		Date: time.Now().Format("01/02/2006"),
+	}
+}
+
+func PostMessage(msg Message) {
 	c := hipchat.NewClient(authKey)
-	msgReq := &hipchat.NotificationRequest{Message: msg}
+	msgReq := &hipchat.NotificationRequest{Message: msg.RawMessage}
 	_, err := c.Room.Notification(roomName, msgReq)
 	if err != nil {
 		panic(err)
@@ -167,11 +185,13 @@ func MonitorTrain(train *Train) {
 	    	buffer.WriteString(start)
 	    	buffer.WriteString(train.PassengerString())
 	    	buffer.WriteString(" on it!")
-	    	PostMessage(buffer.String())
+	    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String())
+	    	PostMessage(msg)
 	    	station.DeleteTrain(train.MapDestination)
 	    	return
 	    case <- train.ReminderTimer.C:
-            PostMessage(fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination))
+	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination))
+            PostMessage(msg)
 	    default:
 		}
 	}
@@ -211,7 +231,8 @@ func DitchTrain(conductor string) {
 		station.DeleteTrain(old.MapDestination)
 		old.Delete <- struct{}{}
 	}
-	PostMessage(finalMsg.String())
+	msgStruct := NewMessage("ditch", old.DisplayDestination, conductor, finalMsg.String())
+	PostMessage(msgStruct)
 }
 
 func Handler(w rest.ResponseWriter, r *rest.Request) {
@@ -220,7 +241,8 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	err := decoder.Decode(&webMsg)	
 	if err != nil {
 		log.Printf(err.Error())
-		PostMessage(err.Error())
+		msg := NewMessage("error", "", "Errol", err.Error())
+		PostMessage(msg)
 		return
 	}
 
@@ -230,7 +252,8 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 
 	var msg string
 	if len(messageParts) < 2 {
-		PostMessage(insufficientParams)
+		msg := NewMessage("insufficientParams", "", conductor, insufficientParams)
+		PostMessage(msg)
 		return 
 	}
 	cmd := strings.ToLower(messageParts[1])
@@ -239,28 +262,33 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	switch cmd {
 	case "help":
 		msg = "Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active"
-		PostMessage(msg)
+		msgStruct := NewMessage("help", "", conductor, msg)
+		PostMessage(msgStruct)
 	case "passengers":
 		dest, _, err := GetDestinationAndTime(2, messageParts, false)
 		if err != nil {
-			PostMessage(err.Error())
+			msgStruct := NewMessage("passengersError", dest, conductor, err.Error())
+			PostMessage(msgStruct)
 			break
 		}
 		train, ok := station.Trains[strings.ToLower(dest)]
 		if !ok {
-			PostMessage(notFound)
+			msgStruct := NewMessage("trainNotFound", dest, conductor, notFound)
+			PostMessage(msgStruct)
 		} else {
 			if len(train.PassengerSet) == 1 {
 				msg = fmt.Sprintf("%v is on the train to %v", train.PassengerString(), train.DisplayDestination)
 			} else {
 				msg = fmt.Sprintf("%v are on the train to %v", train.PassengerString(), train.DisplayDestination)
 			}
-			PostMessage(msg)
+			msgStruct := NewMessage("passengers", train.DisplayDestination, conductor, msg)
+			PostMessage(msgStruct)
 		}
 	case "join":
 		dest, _, err := GetDestinationAndTime(2, messageParts, false)
 		if err != nil {
-			PostMessage(err.Error())
+			msgStruct := NewMessage("joinError", dest, conductor, err.Error())
+			PostMessage(msgStruct)
 			break
 		}
 		train, ok := station.Trains[strings.ToLower(dest)]
@@ -275,29 +303,34 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				station.Lock.Lock()
 				station.Passengers[conductor] = train
 				station.Lock.Unlock()
-				PostMessage(msg)
+				msgStruct := NewMessage("join", train.DisplayDestination, conductor, msg)
+				PostMessage(msgStruct)
 			} else {
-				msg = err.Error()
-				PostMessage(msg)	
+				msgStruct := NewMessage("joinError", dest, conductor, err.Error())
+				PostMessage(msgStruct)	
 			}
 		} else {
-			PostMessage(notFound)
+			msgStruct := NewMessage("joinError", dest, conductor, notFound)
+			PostMessage(msgStruct)
 		} 	
 	case "start":
 		dest, length, err := GetDestinationAndTime(2, messageParts, true)
 		if err != nil {
-			PostMessage(malformed)
+			msgStruct := NewMessage("startError", dest, conductor, malformed)
+			PostMessage(msgStruct)
 			break
 		}
 		if length <= 0 {
 			msg = fmt.Sprintf("Please specify a time greater than 0 mins")
-			PostMessage(msg)
+			msgStruct := NewMessage("startError", dest, conductor, msg)
+			PostMessage(msgStruct)
 			break
 		}
 		_, ok := station.Trains[strings.ToLower(dest)]
 		if ok {
 			msg = fmt.Sprintf("There's already a train to %v!", dest)
-			PostMessage(msg)
+			msgStruct := NewMessage("startError", dest, conductor, msg)
+			PostMessage(msgStruct)
 			break
 		} else { 
 			_, ok := station.Passengers[conductor]
@@ -306,26 +339,30 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			}
 			train := NewTrain(conductor, length, dest)
 			err = station.AddTrain(train)
-			station.Lock.Lock()
-			station.Passengers[conductor] = train
-			station.Lock.Unlock()
-			if err != nil {
-				PostMessage(err.Error())
-				break
-			} else {
+			if err == nil {
+				station.Lock.Lock()
+				station.Passengers[conductor] = train
+				station.Lock.Unlock()
 				msg = fmt.Sprintf("%s has started a train to %v that leaves in %v minutes!", conductor, train.DisplayDestination, length)
-				PostMessage(msg)
+				msgStruct := NewMessage("startTrain", dest, conductor, msg)
+				PostMessage(msgStruct)
 				go MonitorTrain(train)
+			} else {
+				msgStruct := NewMessage("startError", dest, conductor, err.Error())
+				PostMessage(msgStruct)
+				break
 			}
 		}
 	case "active":
 		if len(messageParts) != 2 {
-			PostMessage(malformed)
+			msgStruct := NewMessage("activeError", "", conductor, malformed)
+			PostMessage(msgStruct)
 			break
 		}
 		if len(station.Trains) == 0 {
 			msg = fmt.Sprintf("There are currently no active trains")
-			PostMessage(msg)
+			msgStruct := NewMessage("activeError", "", conductor, msg)
+			PostMessage(msgStruct)
 		} else {
 			var finalMsg bytes.Buffer
 			finalMsg.WriteString("There are trains to: ")
@@ -333,7 +370,8 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			for _, v := range station.Trains {
 				if len(station.Trains) == 1 {
 					msg = fmt.Sprintf("There is currently a train to %v (with %v on it)", v.DisplayDestination, v.PassengerString())
-					PostMessage(msg)
+					msgStruct := NewMessage("active", v.DisplayDestination, conductor, msg)
+					PostMessage(msgStruct)
 					return
 				} else {
 					finalMsg.WriteString(fmt.Sprintf("%v (with %v on it)", v.DisplayDestination, v.PassengerString()))
@@ -347,10 +385,12 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				i++
 				
 			}
-			PostMessage(finalMsg.String())
+			msgStruct := NewMessage("active", "", conductor, finalMsg.String())
+			PostMessage(msgStruct)
 		}
 	default:
-		PostMessage(malformed)
+		msgStruct := NewMessage("malformed", "", conductor, malformed)
+		PostMessage(msgStruct)
 	}
 }
 
@@ -360,11 +400,11 @@ func ValidityHandler(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func main() {
-   	api := rest.NewApi()
+	api := rest.NewApi()
     api.Use(rest.DefaultDevStack...)
     
     router, err := rest.MakeRouter(
-  		rest.Get("/", ValidityHandler),
+    	rest.Get("/", ValidityHandler),
     	rest.Post("/train", Handler),
     )
     
