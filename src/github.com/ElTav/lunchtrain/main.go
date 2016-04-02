@@ -53,7 +53,8 @@ type WebhookMessage struct {
 type Train struct {
 	Lock *sync.Mutex
 	LeavingTimer *time.Timer
-	ReminderTimer *time.Timer
+	TimeRemaining int
+	TimeRemainingTicker *time.Ticker
 	Delete chan struct{}
 	MapDestination string
 	DisplayDestination string
@@ -62,13 +63,14 @@ type Train struct {
 
 func NewTrain(conductor string, departure int, dest string) *Train {
 	timer := time.NewTimer(time.Minute * time.Duration(departure))
-	timer2 := time.NewTimer(time.Minute * time.Duration(departure - 1))	
+	ticker := time.NewTicker(time.Minute)	
 	trainMap := make(map[string]struct{})
 	trainMap[conductor] = struct{}{}
 	return &Train{
 		Lock: &sync.Mutex{},
 		LeavingTimer: timer,
-		ReminderTimer: timer2,
+		TimeRemaining: departure,
+		TimeRemainingTicker: ticker,
 		Delete: make(chan struct{}),
 		MapDestination: strings.ToLower(dest),
 		DisplayDestination: dest,
@@ -222,9 +224,12 @@ func MonitorTrain(train *Train) {
 	    	PostMessage(msg)
 	    	station.DeleteTrain(train.MapDestination)
 	    	return
-	    case <- train.ReminderTimer.C:
-	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination), "reminder")
-            PostMessage(msg)
+	    case <- train.TimeRemainingTicker.C:
+	    	train.TimeRemaining = train.TimeRemaining - 1
+	    	if train.TimeRemaining == 1 {
+				msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination), "reminder")
+            	PostMessage(msg)
+	    	}
 	    default:
 		}
 	}
@@ -424,12 +429,12 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			station.Lock.Lock()
 			for _, v := range station.Trains {
 				if len(station.Trains) == 1 {
-					msg = fmt.Sprintf("There is currently a train to %v (with %v on it)", v.DisplayDestination, v.PassengerString())
+					msg = fmt.Sprintf("There is currently a train to %v in %v mins (with %v on it)", v.DisplayDestination, v.TimeRemaining, v.PassengerString())
 					msgStruct := NewMessage("active", v.DisplayDestination, conductor, msg, baseMessage)
 					PostMessage(msgStruct)
 					return
 				} else {
-					finalMsg.WriteString(fmt.Sprintf("%v (with %v on it)", v.DisplayDestination, v.PassengerString()))
+					finalMsg.WriteString(fmt.Sprintf("%v in %v mins (with %v on it)", v.DisplayDestination, v.TimeRemaining, v.PassengerString()))
 				}
 				if i != len(station.Trains) - 1 {
 					finalMsg.WriteString(", ")
@@ -437,8 +442,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				if i == len(station.Trains) - 2 {
 					finalMsg.WriteString("and ")
 	 		    }
-				i++
-				
+				i++	
 			}
 			station.Lock.Unlock()
 			msgStruct := NewMessage("active", "", conductor, finalMsg.String(), baseMessage)
