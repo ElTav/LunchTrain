@@ -296,7 +296,6 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	cmd := strings.ToLower(messageParts[1])
-	malformed := "Your command is malformed or not found, please view the help message (/train help) for more details"
 	notFound := "That train doesn't exist, please try again"
 	switch cmd {
 	case "help":
@@ -355,7 +354,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	case "start":
 		dest, length, err := GetDestinationAndTime(2, messageParts, true)
 		if err != nil {
-			msgStruct := NewMessage("startError", dest, conductor, malformed, baseMessage)
+			msgStruct := NewMessage("startError", dest, conductor, err.Error(), baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
@@ -394,7 +393,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		}
 	case "active":
 		if len(messageParts) != 2 {
-			msgStruct := NewMessage("activeError", "", conductor, malformed, baseMessage)
+			msgStruct := NewMessage("activeError", "", conductor, "/train active takes no additional args", baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
@@ -428,7 +427,8 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			PostMessage(msgStruct)
 		}
 	default:
-		msgStruct := NewMessage("malformed", "", conductor, malformed, baseMessage)
+		msg := "Your command could not be found, please view the help message (/train help) for more details"
+		msgStruct := NewMessage("malformed", "", conductor, msg, baseMessage)
 		PostMessage(msgStruct)
 	}
 }
