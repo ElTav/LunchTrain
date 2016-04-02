@@ -223,7 +223,7 @@ func MonitorTrain(train *Train) {
 	    	station.DeleteTrain(train.MapDestination)
 	    	return
 	    case <- train.ReminderTimer.C:
-	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination, "reminder"), "")
+	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination), "reminder")
             PostMessage(msg)
 	    default:
 		}
@@ -289,6 +289,11 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		msg := NewMessage("insufficientParams", "", conductor, insufficientParams, baseMessage)
 		PostMessage(msg)
 		return 
+	}
+	if messageParts[0] != "/train" {
+		msg := NewMessage("mention", "", conductor, "mention", baseMessage)
+		MessageToCSV(msg)
+		return
 	}
 	cmd := strings.ToLower(messageParts[1])
 	malformed := "Your command is malformed or not found, please view the help message (/train help) for more details"
