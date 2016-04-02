@@ -213,19 +213,20 @@ func MonitorTrain(train *Train) {
 	for {
 		select {
 		case <- train.Delete:
-			return
-	    case <- train.LeavingTimer.C:
-	    	var buffer bytes.Buffer
-	    	start := fmt.Sprintf("The train to %v has left the station with ", train.DisplayDestination)
-	    	buffer.WriteString(start)
-	    	buffer.WriteString(train.PassengerString())
-	    	buffer.WriteString(" on it!")
-	    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String(), "departure")
-	    	PostMessage(msg)
-	    	station.DeleteTrain(train.MapDestination)
-	    	return
+			return	    	
 	    case <- train.TimeRemainingTicker.C:
 	    	train.TimeRemaining = train.TimeRemaining - 1
+	    	if train.TimeRemaining == 0 {
+	    		var buffer bytes.Buffer
+		    	start := fmt.Sprintf("The train to %v has left the station with ", train.DisplayDestination)
+		    	buffer.WriteString(start)
+		    	buffer.WriteString(train.PassengerString())
+		    	buffer.WriteString(" on it!")
+		    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String(), "departure")
+		    	PostMessage(msg)
+		    	station.DeleteTrain(train.MapDestination)
+	    	return
+	    	}
 	    	if train.TimeRemaining == 1 {
 				msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination), "reminder")
             	PostMessage(msg)
