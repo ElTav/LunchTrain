@@ -153,15 +153,17 @@ type Message struct {
 	User string `csv:"user"`
 	RawMessage string `csv:"message"`
 	Date string `csv:"date"`
+	BaseMessage string `csv:"OG message"`
 }
 
-func NewMessage(category, destination, user, raw string) Message { 
+func NewMessage(category, destination, user, raw, base string) Message { 
 	return Message{
 		Type: category,
 		Destination: destination,
 		User: user,
 		RawMessage: raw,
 		Date: time.Now().Format("01/02/2006"),
+		BaseMessage: base,
 	}
 }
 
@@ -179,11 +181,13 @@ func PostMessage(msg Message) {
 
 
 func MessageToCSV(msg Message) error {
+	fileMutex.Lock()
 	file, err := os.OpenFile("log.csv", os.O_RDWR | os.O_CREATE, 0666)
 	if err != nil {
 		log.Println("Error opening file: ", err)
 	}
 	defer file.Close()
+	defer fileMutex.Unlock()
 	messages := []*Message{}
 	if _, err := gocsv.MarshalString(&messages); err == nil {
     		if err := gocsv.UnmarshalFile(file, &messages); err != nil { // Load clients from file
@@ -214,12 +218,12 @@ func MonitorTrain(train *Train) {
 	    	buffer.WriteString(start)
 	    	buffer.WriteString(train.PassengerString())
 	    	buffer.WriteString(" on it!")
-	    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String())
+	    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String(), "departure")
 	    	PostMessage(msg)
 	    	station.DeleteTrain(train.MapDestination)
 	    	return
 	    case <- train.ReminderTimer.C:
-	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination))
+	    	msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination, "reminder"), "")
             PostMessage(msg)
 	    default:
 		}
@@ -260,7 +264,7 @@ func DitchTrain(conductor string) {
 		station.DeleteTrain(old.MapDestination)
 		old.Delete <- struct{}{}
 	}
-	msgStruct := NewMessage("ditch", old.DisplayDestination, conductor, finalMsg.String())
+	msgStruct := NewMessage("ditch", old.DisplayDestination, conductor, finalMsg.String(), "ditch")
 	PostMessage(msgStruct)
 }
 
@@ -270,18 +274,19 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	err := decoder.Decode(&webMsg)	
 	if err != nil {
 		log.Printf(err.Error())
-		msg := NewMessage("error", "", "Errol", err.Error())
+		msg := NewMessage("error", "", "Errol", err.Error(), "error decoding")
 		PostMessage(msg)
 		return
 	}
 
 	conductor := webMsg.Item.MessageStruct.From.MentionName
 	insufficientParams := fmt.Sprintf("%v messed up and forgot to provide the sufficient number of params", conductor)
-	messageParts := strings.Split(webMsg.Item.MessageStruct.Message, " ")
+	baseMessage := webMsg.Item.MessageStruct.Message
+	messageParts := strings.Split(baseMessage, " ")
 
 	var msg string
 	if len(messageParts) < 2 {
-		msg := NewMessage("insufficientParams", "", conductor, insufficientParams)
+		msg := NewMessage("insufficientParams", "", conductor, insufficientParams, baseMessage)
 		PostMessage(msg)
 		return 
 	}
@@ -291,18 +296,18 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 	switch cmd {
 	case "help":
 		msg = "Usage: /train start <destination> <#minutes> || /train join <destination> || /train passengers <destination> || /train active"
-		msgStruct := NewMessage("help", "", conductor, msg)
+		msgStruct := NewMessage("help", "", conductor, msg, baseMessage)
 		PostMessage(msgStruct)
 	case "passengers":
 		dest, _, err := GetDestinationAndTime(2, messageParts, false)
 		if err != nil {
-			msgStruct := NewMessage("passengersError", dest, conductor, err.Error())
-			PostMessage(msgStruct)
+			msg := NewMessage("passengersError", dest, conductor, err.Error(), baseMessage)
+			PostMessage(msg)
 			break
 		}
 		train, ok := station.Trains[strings.ToLower(dest)]
 		if !ok {
-			msgStruct := NewMessage("trainNotFound", dest, conductor, notFound)
+			msgStruct := NewMessage("trainNotFound", dest, conductor, notFound, baseMessage)
 			PostMessage(msgStruct)
 		} else {
 			if len(train.PassengerSet) == 1 {
@@ -310,13 +315,13 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			} else {
 				msg = fmt.Sprintf("%v are on the train to %v", train.PassengerString(), train.DisplayDestination)
 			}
-			msgStruct := NewMessage("passengers", train.DisplayDestination, conductor, msg)
+			msgStruct := NewMessage("passengers", train.DisplayDestination, conductor, msg, baseMessage)
 			PostMessage(msgStruct)
 		}
 	case "join":
 		dest, _, err := GetDestinationAndTime(2, messageParts, false)
 		if err != nil {
-			msgStruct := NewMessage("joinError", dest, conductor, err.Error())
+			msgStruct := NewMessage("joinError", dest, conductor, err.Error(), baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
@@ -332,33 +337,33 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				station.Lock.Lock()
 				station.Passengers[conductor] = train
 				station.Lock.Unlock()
-				msgStruct := NewMessage("join", train.DisplayDestination, conductor, msg)
+				msgStruct := NewMessage("join", train.DisplayDestination, conductor, msg, baseMessage)
 				PostMessage(msgStruct)
 			} else {
-				msgStruct := NewMessage("joinError", dest, conductor, err.Error())
+				msgStruct := NewMessage("joinError", dest, conductor, err.Error(), baseMessage)
 				PostMessage(msgStruct)	
 			}
 		} else {
-			msgStruct := NewMessage("joinError", dest, conductor, notFound)
+			msgStruct := NewMessage("joinError", dest, conductor, notFound, baseMessage)
 			PostMessage(msgStruct)
 		} 	
 	case "start":
 		dest, length, err := GetDestinationAndTime(2, messageParts, true)
 		if err != nil {
-			msgStruct := NewMessage("startError", dest, conductor, malformed)
+			msgStruct := NewMessage("startError", dest, conductor, malformed, baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
 		if length <= 0 {
 			msg = fmt.Sprintf("Please specify a time greater than 0 mins")
-			msgStruct := NewMessage("startError", dest, conductor, msg)
+			msgStruct := NewMessage("startError", dest, conductor, msg, baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
 		_, ok := station.Trains[strings.ToLower(dest)]
 		if ok {
 			msg = fmt.Sprintf("There's already a train to %v!", dest)
-			msgStruct := NewMessage("startError", dest, conductor, msg)
+			msgStruct := NewMessage("startError", dest, conductor, msg, baseMessage)
 			PostMessage(msgStruct)
 			break
 		} else { 
@@ -373,24 +378,24 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				station.Passengers[conductor] = train
 				station.Lock.Unlock()
 				msg = fmt.Sprintf("%s has started a train to %v that leaves in %v minutes!", conductor, train.DisplayDestination, length)
-				msgStruct := NewMessage("startTrain", dest, conductor, msg)
+				msgStruct := NewMessage("startTrain", dest, conductor, msg, baseMessage)
 				PostMessage(msgStruct)
 				go MonitorTrain(train)
 			} else {
-				msgStruct := NewMessage("startError", dest, conductor, err.Error())
+				msgStruct := NewMessage("startError", dest, conductor, err.Error(), baseMessage)
 				PostMessage(msgStruct)
 				break
 			}
 		}
 	case "active":
 		if len(messageParts) != 2 {
-			msgStruct := NewMessage("activeError", "", conductor, malformed)
+			msgStruct := NewMessage("activeError", "", conductor, malformed, baseMessage)
 			PostMessage(msgStruct)
 			break
 		}
 		if len(station.Trains) == 0 {
 			msg = fmt.Sprintf("There are currently no active trains")
-			msgStruct := NewMessage("activeError", "", conductor, msg)
+			msgStruct := NewMessage("activeError", "", conductor, msg, baseMessage)
 			PostMessage(msgStruct)
 		} else {
 			var finalMsg bytes.Buffer
@@ -399,7 +404,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			for _, v := range station.Trains {
 				if len(station.Trains) == 1 {
 					msg = fmt.Sprintf("There is currently a train to %v (with %v on it)", v.DisplayDestination, v.PassengerString())
-					msgStruct := NewMessage("active", v.DisplayDestination, conductor, msg)
+					msgStruct := NewMessage("active", v.DisplayDestination, conductor, msg, baseMessage)
 					PostMessage(msgStruct)
 					return
 				} else {
@@ -414,11 +419,11 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				i++
 				
 			}
-			msgStruct := NewMessage("active", "", conductor, finalMsg.String())
+			msgStruct := NewMessage("active", "", conductor, finalMsg.String(), baseMessage)
 			PostMessage(msgStruct)
 		}
 	default:
-		msgStruct := NewMessage("malformed", "", conductor, malformed)
+		msgStruct := NewMessage("malformed", "", conductor, malformed, baseMessage)
 		PostMessage(msgStruct)
 	}
 }
