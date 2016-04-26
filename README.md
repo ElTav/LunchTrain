@@ -5,7 +5,7 @@ A HipChat integration primarily intended to help its users collaborate on places
 
 Usage (from within HipChat, presumes set up with /train as the slash cmd):
 
-<code> /train help </code> Sisplays the help 
+<code> /train help </code> Displays the help 
 
 <code> /train start <Destination> <Duration (int, minutes)> </code> Starts a train to <Destination> that leaves in <Duration> mins
 
