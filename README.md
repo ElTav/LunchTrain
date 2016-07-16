@@ -13,6 +13,6 @@ Usage (from within HipChat, presumes set up with /train as the slash cmd):
 
 <code> /train join <Destination> </code> Joins a train going to the specified destination
 
-<code> /train passengers <Destination </code> Reports all passengers for the specified destination
+<code> /train passengers <Destination> </code> Reports all passengers for the specified destination
 
 <code> /train active </code> Reports a list of all the active trains and the time left on them
