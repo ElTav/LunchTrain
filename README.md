@@ -3,6 +3,8 @@ LunchTrain
 
 A HipChat integration primarily intended to help its users collaborate on places to get lunch
 
+You can find an article I've written on ideology behind LunchTrain here -> http://clypd.com/staying-on-track-for-lunchtime/
+
 Usage (from within HipChat, presumes set up with /train as the slash cmd):
 
 <code> /train help </code> Displays the help 
