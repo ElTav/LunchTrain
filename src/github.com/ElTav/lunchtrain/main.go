@@ -1,24 +1,23 @@
 package main
 
 import (
-    "github.com/ant0ine/go-json-rest/rest"
-    "github.com/tbruyelle/hipchat-go/hipchat"
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "log"
-    "net/http"
-    "os"
-    "strconv"
-    "strings"
-    "sync"
-    "time"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/tbruyelle/hipchat-go/hipchat"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
 /*
 To-do list
 ---------
-Time left on a train (is this possible?)
 Start a train at a designated time
 Tag people when the train leaves (message them?)
 -----
@@ -31,53 +30,52 @@ var authKey string = ""
 var roomName string = ""
 
 var station *Station = &Station{
-	Lock: &sync.Mutex{},
+	Lock:       &sync.Mutex{},
 	Passengers: make(map[string]*Train),
-	Trains: make(map[string]*Train),
+	Trains:     make(map[string]*Train),
 }
 
 var fileMutex = &sync.Mutex{}
 
 type WebhookMessage struct {
-    Item struct {
-        MessageStruct struct {
-        	From struct {
-        		MentionName string `json:"mention_name"`
-        	}
-        	Message string `json:"message"`
-        } `json:"message"`
-        
-    }  `json:"item"`
+	Item struct {
+		MessageStruct struct {
+			From struct {
+				MentionName string `json:"mention_name"`
+			}
+			Message string `json:"message"`
+		} `json:"message"`
+	} `json:"item"`
 }
 
 type Train struct {
-	Lock *sync.Mutex
-	LeavingTimer *time.Timer
-	TimeRemaining int
+	Lock                *sync.Mutex
+	LeavingTimer        *time.Timer
+	TimeRemaining       int
 	TimeRemainingTicker *time.Ticker
-	Delete chan struct{}
-	MapDestination string
-	DisplayDestination string
-	PassengerSet map[string]struct{}
+	Delete              chan struct{}
+	MapDestination      string
+	DisplayDestination  string
+	PassengerSet        map[string]struct{}
 }
 
 func NewTrain(conductor string, departure int, dest string) *Train {
 	timer := time.NewTimer(time.Minute * time.Duration(departure))
-	ticker := time.NewTicker(time.Minute)	
+	ticker := time.NewTicker(time.Minute)
 	trainMap := make(map[string]struct{})
 	trainMap[conductor] = struct{}{}
 	return &Train{
-		Lock: &sync.Mutex{},
-		LeavingTimer: timer,
-		TimeRemaining: departure,
+		Lock:                &sync.Mutex{},
+		LeavingTimer:        timer,
+		TimeRemaining:       departure,
 		TimeRemainingTicker: ticker,
-		Delete: make(chan struct{}),
-		MapDestination: strings.ToLower(dest),
-		DisplayDestination: dest,
-		PassengerSet: trainMap,
-	}	
+		Delete:              make(chan struct{}),
+		MapDestination:      strings.ToLower(dest),
+		DisplayDestination:  dest,
+		PassengerSet:        trainMap,
+	}
 }
- 
+
 func (t *Train) NewPassenger(pass string) error {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
@@ -86,9 +84,9 @@ func (t *Train) NewPassenger(pass string) error {
 		t.PassengerSet[pass] = struct{}{}
 		return nil
 	} else {
-		log.Printf("Passenger %s is already on the train\n", pass) 
+		log.Printf("Passenger %s is already on the train\n", pass)
 		return fmt.Errorf("Passenger %s is already on the train", pass)
-	}	
+	}
 }
 
 func (t *Train) PassengerString() string {
@@ -97,23 +95,23 @@ func (t *Train) PassengerString() string {
 	var buffer bytes.Buffer
 	i := 0
 	for v, _ := range t.PassengerSet {
-	   buffer.WriteString(v)
-	   if i != len(t.PassengerSet) - 1 {
-	    	buffer.WriteString(", ")
-	    }
-	   if i == len(t.PassengerSet) - 2 {
-	    	buffer.WriteString("and ")
-	   }
-	   i++
+		buffer.WriteString(v)
+		if i != len(t.PassengerSet)-1 {
+			buffer.WriteString(", ")
+		}
+		if i == len(t.PassengerSet)-2 {
+			buffer.WriteString("and ")
+		}
+		i++
 	}
 	return buffer.String()
-	 
+
 }
 
 type Station struct {
-	Lock *sync.Mutex
+	Lock       *sync.Mutex
 	Passengers map[string]*Train
-	Trains map[string]*Train
+	Trains     map[string]*Train
 }
 
 func (s *Station) AddTrain(t *Train) error {
@@ -150,21 +148,21 @@ func (s *Station) DeleteTrain(dest string) error {
 }
 
 type Message struct {
-	Type string `csv:"type"`
+	Type        string `csv:"type"`
 	Destination string `csv:"destination"`
-	User string `csv:"user"`
-	RawMessage string `csv:"message"`
-	Date string `csv:"date"`
+	User        string `csv:"user"`
+	RawMessage  string `csv:"message"`
+	Date        string `csv:"date"`
 	BaseMessage string `csv:"OG message"`
 }
 
-func NewMessage(category, destination, user, raw, base string) Message { 
+func NewMessage(category, destination, user, raw, base string) Message {
 	return Message{
-		Type: category,
+		Type:        category,
 		Destination: destination,
-		User: user,
-		RawMessage: raw,
-		Date: time.Now().Format("01/02/2006"),
+		User:        user,
+		RawMessage:  raw,
+		Date:        time.Now().Format("01/02/2006"),
 		BaseMessage: base,
 	}
 }
@@ -181,10 +179,9 @@ func PostMessage(msg Message) {
 	}
 }
 
-
 func MessageToCSV(msg Message) error {
 	fileMutex.Lock()
-	file, err := os.OpenFile("log.csv", os.O_RDWR | os.O_CREATE, 0666)
+	file, err := os.OpenFile("log.csv", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Println("Error opening file: ", err)
 	}
@@ -192,46 +189,46 @@ func MessageToCSV(msg Message) error {
 	defer fileMutex.Unlock()
 	messages := []*Message{}
 	if _, err := gocsv.MarshalString(&messages); err == nil {
-    		if err := gocsv.UnmarshalFile(file, &messages); err != nil { // Load clients from file
-     		   log.Println("Error unmarshaling the file")
-     		   return err
-    		}
-    		messages := append(messages, &msg)
-    		if _, err := file.Seek(0, 0); err != nil { // Go to the start of the file
-    			log.Printf("Error seeking %v", err)
-    			return err
-    		}
-    		if err = gocsv.MarshalFile(&messages, file); err != nil {
-    			log.Println("Error writing open file ", err)
-    			return err
-    		}
-    }
+		if err := gocsv.UnmarshalFile(file, &messages); err != nil { // Load clients from file
+			log.Println("Error unmarshaling the file")
+			return err
+		}
+		messages := append(messages, &msg)
+		if _, err := file.Seek(0, 0); err != nil { // Go to the start of the file
+			log.Printf("Error seeking %v", err)
+			return err
+		}
+		if err = gocsv.MarshalFile(&messages, file); err != nil {
+			log.Println("Error writing open file ", err)
+			return err
+		}
+	}
 	return nil
 }
 
 func MonitorTrain(train *Train) {
 	for {
 		select {
-		case <- train.Delete:
-			return	    	
-	    case <- train.TimeRemainingTicker.C:
-	    	train.TimeRemaining = train.TimeRemaining - 1
-	    	if train.TimeRemaining == 0 {
-	    		var buffer bytes.Buffer
-		    	start := fmt.Sprintf("The train to %v has left the station with ", train.DisplayDestination)
-		    	buffer.WriteString(start)
-		    	buffer.WriteString(train.PassengerString())
-		    	buffer.WriteString(" on it!")
-		    	msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String(), "departure")
-		    	PostMessage(msg)
-		    	station.DeleteTrain(train.MapDestination)
-	    	return
-	    	}
-	    	if train.TimeRemaining == 1 {
+		case <-train.Delete:
+			return
+		case <-train.TimeRemainingTicker.C:
+			train.TimeRemaining = train.TimeRemaining - 1
+			if train.TimeRemaining == 0 {
+				var buffer bytes.Buffer
+				start := fmt.Sprintf("The train to %v has left the station with ", train.DisplayDestination)
+				buffer.WriteString(start)
+				buffer.WriteString(train.PassengerString())
+				buffer.WriteString(" on it!")
+				msg := NewMessage("departure", train.DisplayDestination, "departure", buffer.String(), "departure")
+				PostMessage(msg)
+				station.DeleteTrain(train.MapDestination)
+				return
+			}
+			if train.TimeRemaining == 1 {
 				msg := NewMessage("reminder", train.DisplayDestination, "reminder", fmt.Sprintf("Reminder, the next train to %v leaves in one minute", train.DisplayDestination), "reminder")
-            	PostMessage(msg)
-	    	}
-	    default:
+				PostMessage(msg)
+			}
+		default:
 		}
 	}
 }
@@ -241,7 +238,7 @@ func GetDestinationAndTime(start int, messageParts []string, getTime bool) (stri
 	for i := start; i < len(messageParts); i++ {
 		if getTime {
 			num, err := strconv.Atoi(messageParts[i])
-			if err == nil && i == len(messageParts) - 1 && i != 2 {
+			if err == nil && i == len(messageParts)-1 && i != 2 {
 				return dest.String(), num, nil
 			}
 		}
@@ -277,7 +274,7 @@ func DitchTrain(conductor string) {
 func Handler(w rest.ResponseWriter, r *rest.Request) {
 	var webMsg WebhookMessage
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&webMsg)	
+	err := decoder.Decode(&webMsg)
 	if err != nil {
 		log.Printf(err.Error())
 		msg := NewMessage("error", "", "Errol", err.Error(), "error decoding json")
@@ -294,7 +291,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 		msg := fmt.Sprintf("%v messed up and forgot to provide the sufficient number of params", conductor)
 		msgStruct := NewMessage("insufficientParams", "", conductor, msg, baseMessage)
 		PostMessage(msgStruct)
-		return 
+		return
 	}
 	if messageParts[0] != "/train" {
 		msg := NewMessage("mention", "", conductor, "mention", baseMessage)
@@ -363,12 +360,12 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				PostMessage(msgStruct)
 			} else {
 				msgStruct := NewMessage("joinError", dest, conductor, err.Error(), baseMessage)
-				PostMessage(msgStruct)	
+				PostMessage(msgStruct)
 			}
 		} else {
 			msgStruct := NewMessage("joinError", dest, conductor, notFound, baseMessage)
 			PostMessage(msgStruct)
-		} 	
+		}
 	case "start":
 		dest, length, err := GetDestinationAndTime(2, messageParts, true)
 		if err != nil {
@@ -390,7 +387,7 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 			msgStruct := NewMessage("startError", dest, conductor, msg, baseMessage)
 			PostMessage(msgStruct)
 			return
-		} else { 
+		} else {
 			station.Lock.Lock()
 			_, ok := station.Passengers[conductor]
 			station.Lock.Unlock()
@@ -437,13 +434,13 @@ func Handler(w rest.ResponseWriter, r *rest.Request) {
 				} else {
 					finalMsg.WriteString(fmt.Sprintf("%v in %v mins (with %v on it)", v.DisplayDestination, v.TimeRemaining, v.PassengerString()))
 				}
-				if i != len(station.Trains) - 1 {
+				if i != len(station.Trains)-1 {
 					finalMsg.WriteString(", ")
 				}
-				if i == len(station.Trains) - 2 {
+				if i == len(station.Trains)-2 {
 					finalMsg.WriteString("and ")
-	 		    }
-				i++	
+				}
+				i++
 			}
 			station.Lock.Unlock()
 			msgStruct := NewMessage("active", "", conductor, finalMsg.String(), baseMessage)
@@ -463,22 +460,22 @@ func ValidityHandler(w rest.ResponseWriter, r *rest.Request) {
 
 func main() {
 	api := rest.NewApi()
-    api.Use(rest.DefaultDevStack...)
-    
-    router, err := rest.MakeRouter(
-    	rest.Get("/", ValidityHandler),
-    	rest.Post("/train", Handler),
-    )
-    
-    api.SetApp(router)
-    ip := os.Getenv("OPENSHIFT_GO_IP")
-    port := os.Getenv("OPENSHIFT_GO_PORT")
-    if port == "" {
-    	port = "8080"
-    }
-    bind := fmt.Sprintf("%s:%s",ip,port)
+	api.Use(rest.DefaultDevStack...)
+
+	router, err := rest.MakeRouter(
+		rest.Get("/", ValidityHandler),
+		rest.Post("/train", Handler),
+	)
+
+	api.SetApp(router)
+	ip := os.Getenv("OPENSHIFT_GO_IP")
+	port := os.Getenv("OPENSHIFT_GO_PORT")
+	if port == "" {
+		port = "8080"
+	}
+	bind := fmt.Sprintf("%s:%s", ip, port)
 	err = http.ListenAndServe(bind, api.MakeHandler())
 	if err != nil {
-    	log.Println(err)
-    }
+		log.Println(err)
+	}
 }
